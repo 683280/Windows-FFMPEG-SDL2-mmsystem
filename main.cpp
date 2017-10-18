@@ -52,8 +52,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     uint8_t *buffer = static_cast<uint8_t *>(av_malloc(image_size));
     av_image_fill_arrays(sws_frame->data, sws_frame->linesize, buffer, AV_PIX_FMT_YUV420P, width, height, 1);
     //SDL
-
-
     window = SDL_CreateWindow("WS Video Play SDL2", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     sdlRenderer = SDL_CreateRenderer(window, -1, 0);
@@ -81,7 +79,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     swr_init(swr_ctx);
     uint8_t * pcm_buffer = (uint8_t *)(malloc(8196));
-
+    SDL_Event event;
     while (1) {
         if (av_read_frame(formatCtx, &pkt) < 0) {
             break;
@@ -91,6 +89,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             if (avcodec_receive_frame(video_codec_ctx, vframe) == 0) {
                 int i = sws_scale(sws_ctx, (const uint8_t *const *) (vframe->data), vframe->linesize, 0, vframe->height,
                                   sws_frame->data, sws_frame->linesize);
+                av_frame_unref(vframe);
                 //设置纹理的数据
                 SDL_UpdateTexture(sdlTexture, NULL, sws_frame->data[0], width);
                 SDL_RenderClear(sdlRenderer);
@@ -112,10 +111,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 }
                 int i = swr_convert(swr_ctx, &pcm_buffer, size, (uint8_t const **) (aframe->extended_data),
                                     aframe->nb_samples);
-//                playbackPCM(reinterpret_cast<char *>(pcm_buffer), size);
+                av_frame_unref(aframe);
                 ps->toSpeaker(pcm_buffer,size);
             }
         }
+        av_packet_unref(&pkt);
+        SDL_PollEvent(&event);
+        switch( event.type ) {
+            case SDL_QUIT:
+                break;
+            default:
+                break;
+        }
     }
     SDL_Quit();//退出系统
+    exit(0);
 }
